@@ -1,5 +1,5 @@
 {
     "componentChunkName": "component---src-pages-release-notes-index-tsx",
     "path": "/release-notes/",
-    "result": {"pageContext":{"hrefs":{"next":{"label":"Older: 1.17.2","href":"/release-notes/1.17.2"}}}},
+    "result": {"pageContext":{"hrefs":{"next":{"label":"Older: 1.18.0","href":"/release-notes/1.18.0"}}}},
     "staticQueryHashes": []}
