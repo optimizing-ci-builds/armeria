@@ -1,4 +1,4 @@
-name: CI
+name: CI .
 on: [push]
       # The release versions will be verified by 'publish-release.yml'
 
