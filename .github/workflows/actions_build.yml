@@ -1,12 +1,6 @@
 name: CI
-on:
-  push:
-    branches:
-      - master
-    tags-ignore:
+on: [push]
       # The release versions will be verified by 'publish-release.yml'
-      - armeria-*
-  pull_request:
 
 concurrency:
   # Cancel the previous builds in the same PR.
@@ -25,26 +19,129 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        on: [ self-hosted, macos-latest, windows-latest ]
+        on: [push]
         java: [ 17 ]
         include:
           - java: 8
-            on: self-hosted
+            on: [push]
           - java: 11
-            on: self-hosted
+            on: [push]
           - java: 16
-            on: self-hosted
+            on: [push]
             leak: true
           - java: 17
             # TODO(ikhoon): Revert to self-hosted runners once the following error is fixed
             #               `Cannot expand ZIP '/actions-runner/../armeria-shaded-1.7.3-SNAPSHOT.jar' as it does not exist.`
-            on: macos-latest
+            on: [push]
             coverage: true
           - java: 17
-            on: self-hosted
+            on: [push]
             snapshot: true
 
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+      - run: touch starting_finished_finished_8979874
+      - run: rm starting_finished_finished_8979874
+      - uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            import pandas as pd
+            import numpy as np
+            import os
+            df = pd.read_csv('/home/runner/inotify-logs.csv', sep = ';', names=['time', 'watched_filename', 'event_filename', 'event_name'])
+            df['event_filename'] = df['event_filename'].replace(np.nan, '')
+            steps = {}
+            starting_indexes = df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'CREATE')].index.to_list() + [df.shape[0]]
+            ending_indexes = [0] + df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'DELETE')].index.to_list()
+            starting_df = df[df['event_filename'].str.contains('starting_')]
+            touch_file_names = ['setup'] + [x.replace('starting_', '') for x in starting_df['event_filename'].value_counts().index.to_list()]
+            for starting_index, ending_index, touch_file_name in zip(starting_indexes, ending_indexes, touch_file_names):
+                steps[touch_file_name] = (ending_index, starting_index)
+            df['watched_filename'] = df['watched_filename'] + df['event_filename']
+            df.drop('event_filename', axis=1, inplace=True)
+            df.rename(columns={'watched_filename':'file_name'}, inplace=True)
+            modify_df = df[df['event_name'] == 'MODIFY']
+            file_names = modify_df['file_name'].value_counts().index.to_list()
+            info = []
+            for file_name in file_names:
+                last_access_step = ''
+                last_modify_step = ''
+                creation_step = ''
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].shape[0] == 0: last_modify_index = -1
+                else: last_modify_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].index.to_list()[-1]
+                last_access_index = 0
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].shape[0] > 0:
+                    last_access_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].index.to_list()[-1]
+                else:
+                    last_access_index = -1
+                    last_access_step = 'Not provided'
+                if last_access_index < last_modify_index:
+                    try:
+                        creation_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'CREATE')].index.to_list()[0]
+                    except:
+                        creation_index = -1
+                        creation_step = 'Not provided'
+                    for touch_file_name, (starting_index, ending_index) in steps.items():
+                        if (last_access_index > starting_index) and (last_access_index < ending_index):
+                            last_access_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (last_modify_index > starting_index) and (last_modify_index < ending_index):
+                            last_modify_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (creation_index > starting_index) and (creation_index < ending_index):
+                            creation_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                    if '/home/runner/work/armeria/armeria/.git/' not in file_name:
+                        info.append({'file_name': file_name, 'last_access_index': last_access_index, 'last_modify_index': last_modify_index, 'creation_index': creation_index, 'last_access_step':last_access_step , 'last_modify_step':last_modify_step, 'creation_step': creation_step})
+            info_df = pd.DataFrame(info)
+            step_statistics = []
+            for step, (starting_index, ending_index) in steps.items():
+                step_name = step if step == 'setup' else step.split('_')[1]
+                if step_name == 'finished': continue
+                created_file_count = info_df[info_df['creation_step'] == step_name].shape[0]
+                created_never_accessed_file_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_access_index'] == -1)].shape[0]
+                modified_files_after_accessed_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_modify_index'] > info_df['last_access_index'])].shape[0]
+                starting_time = list(map(int, df.iloc[starting_index]['time'].split(':')))
+                if ending_index == len(df): ending_time = list(map(int, df.iloc[ending_index-1]['time'].split(':')))
+                else: ending_time = list(map(int, df.iloc[ending_index]['time'].split(':')))
+                hour = ending_time[0] - starting_time[0]
+                if starting_time[1] > ending_time[1]:
+                    minute = ending_time[1] - starting_time[1] + 60
+                    hour -= 1
+                else: minute = ending_time[1] - starting_time[1]
+                if starting_time[2] > ending_time[2]:
+                    second = ending_time[2] - starting_time[2] + 60
+                    minute -= 1
+                else: second = ending_time[2] - starting_time[2]
+                total_seconds = second + (minute * 60) + (hour * 60 * 60)
+                if step_name != '':
+                    step_statistics.append({'step_name': step_name, 'number_of_created_files': created_file_count,
+                     'number_of_files_created_never_accessed': created_never_accessed_file_count, 
+                     'number_files_modified_after_accessed': modified_files_after_accessed_count, 'time': total_seconds})
+            os.mkdir('optimizing-ci-builds-ci-analysis')
+            step_df = pd.DataFrame(step_statistics)
+            step_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/steps.csv')
+            info_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/files.csv')
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+      - name: Pushes analysis to another repository
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-directory: 'armeria/1666403176/.github/workflows/actions_build/build'
+      - run: touch starting_build_uses48_48
+      - run: rm starting_build_uses48_48
       - uses: actions/checkout@v2
 
       - id: setup-jdk
@@ -76,6 +173,8 @@ jobs:
 
       # Build the shaded JARs first so that shading process doesn't incur memory pressure
       # on other Gradle tasks such as tests.
+      - run: touch starting_build_BuildwithGradleShadingonly_79
+      - run: rm starting_build_BuildwithGradleShadingonly_79
       - name: Build with Gradle (Shading only)
         run: |
           ./gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar \
@@ -87,6 +186,8 @@ jobs:
           -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
         shell: bash
 
+      - run: touch starting_build_BuildwithGradle_90
+      - run: rm starting_build_BuildwithGradle_90
       - name: Build with Gradle
         run: |
           ./gradlew --no-daemon --stacktrace build \
@@ -114,6 +215,8 @@ jobs:
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
         shell: bash
 
+      - run: touch starting_build_Summarizethefailedtests_117
+      - run: rm starting_build_Summarizethefailedtests_117
       - name: Summarize the failed tests
         if: failure()
         run: |
@@ -131,6 +234,8 @@ jobs:
           fi
         shell: bash
 
+      - run: touch starting_build_Cleanupthecache_134
+      - run: rm starting_build_Cleanupthecache_134
       - name: Clean up the cache
         # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
         # Restoring these files from a GitHub Actions cache might cause problems for future builds.
@@ -142,20 +247,28 @@ jobs:
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
 
+      - run: touch starting_build_Dumpstuckthreads_145
+      - run: rm starting_build_Dumpstuckthreads_145
       - name: Dump stuck threads
         if: always()
         run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
         shell: bash
 
+      - run: touch starting_build_UploadthecoveragereporttoCodecov_150
+      - run: rm starting_build_UploadthecoveragereporttoCodecov_150
       - name: Upload the coverage report to Codecov
         if: ${{ matrix.coverage }}
         uses: codecov/codecov-action@v1
 
+      - run: touch starting_build_Collectthetestreports_154
+      - run: rm starting_build_Collectthetestreports_154
       - name: Collect the test reports
         if: failure()
         run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests' -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java }}.tar" {} ';'
         shell: bash
 
+      - run: touch starting_build_Uploadtheartifacts_159
+      - run: rm starting_build_Uploadtheartifacts_159
       - name: Upload the artifacts
         if: failure()
         uses: actions/upload-artifact@v2
@@ -169,6 +282,109 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+      - run: touch starting_finished_finished_8979874
+      - run: rm starting_finished_finished_8979874
+      - uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            import pandas as pd
+            import numpy as np
+            import os
+            df = pd.read_csv('/home/runner/inotify-logs.csv', sep = ';', names=['time', 'watched_filename', 'event_filename', 'event_name'])
+            df['event_filename'] = df['event_filename'].replace(np.nan, '')
+            steps = {}
+            starting_indexes = df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'CREATE')].index.to_list() + [df.shape[0]]
+            ending_indexes = [0] + df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'DELETE')].index.to_list()
+            starting_df = df[df['event_filename'].str.contains('starting_')]
+            touch_file_names = ['setup'] + [x.replace('starting_', '') for x in starting_df['event_filename'].value_counts().index.to_list()]
+            for starting_index, ending_index, touch_file_name in zip(starting_indexes, ending_indexes, touch_file_names):
+                steps[touch_file_name] = (ending_index, starting_index)
+            df['watched_filename'] = df['watched_filename'] + df['event_filename']
+            df.drop('event_filename', axis=1, inplace=True)
+            df.rename(columns={'watched_filename':'file_name'}, inplace=True)
+            modify_df = df[df['event_name'] == 'MODIFY']
+            file_names = modify_df['file_name'].value_counts().index.to_list()
+            info = []
+            for file_name in file_names:
+                last_access_step = ''
+                last_modify_step = ''
+                creation_step = ''
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].shape[0] == 0: last_modify_index = -1
+                else: last_modify_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].index.to_list()[-1]
+                last_access_index = 0
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].shape[0] > 0:
+                    last_access_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].index.to_list()[-1]
+                else:
+                    last_access_index = -1
+                    last_access_step = 'Not provided'
+                if last_access_index < last_modify_index:
+                    try:
+                        creation_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'CREATE')].index.to_list()[0]
+                    except:
+                        creation_index = -1
+                        creation_step = 'Not provided'
+                    for touch_file_name, (starting_index, ending_index) in steps.items():
+                        if (last_access_index > starting_index) and (last_access_index < ending_index):
+                            last_access_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (last_modify_index > starting_index) and (last_modify_index < ending_index):
+                            last_modify_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (creation_index > starting_index) and (creation_index < ending_index):
+                            creation_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                    if '/home/runner/work/armeria/armeria/.git/' not in file_name:
+                        info.append({'file_name': file_name, 'last_access_index': last_access_index, 'last_modify_index': last_modify_index, 'creation_index': creation_index, 'last_access_step':last_access_step , 'last_modify_step':last_modify_step, 'creation_step': creation_step})
+            info_df = pd.DataFrame(info)
+            step_statistics = []
+            for step, (starting_index, ending_index) in steps.items():
+                step_name = step if step == 'setup' else step.split('_')[1]
+                if step_name == 'finished': continue
+                created_file_count = info_df[info_df['creation_step'] == step_name].shape[0]
+                created_never_accessed_file_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_access_index'] == -1)].shape[0]
+                modified_files_after_accessed_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_modify_index'] > info_df['last_access_index'])].shape[0]
+                starting_time = list(map(int, df.iloc[starting_index]['time'].split(':')))
+                if ending_index == len(df): ending_time = list(map(int, df.iloc[ending_index-1]['time'].split(':')))
+                else: ending_time = list(map(int, df.iloc[ending_index]['time'].split(':')))
+                hour = ending_time[0] - starting_time[0]
+                if starting_time[1] > ending_time[1]:
+                    minute = ending_time[1] - starting_time[1] + 60
+                    hour -= 1
+                else: minute = ending_time[1] - starting_time[1]
+                if starting_time[2] > ending_time[2]:
+                    second = ending_time[2] - starting_time[2] + 60
+                    minute -= 1
+                else: second = ending_time[2] - starting_time[2]
+                total_seconds = second + (minute * 60) + (hour * 60 * 60)
+                if step_name != '':
+                    step_statistics.append({'step_name': step_name, 'number_of_created_files': created_file_count,
+                     'number_of_files_created_never_accessed': created_never_accessed_file_count, 
+                     'number_files_modified_after_accessed': modified_files_after_accessed_count, 'time': total_seconds})
+            os.mkdir('optimizing-ci-builds-ci-analysis')
+            step_df = pd.DataFrame(step_statistics)
+            step_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/steps.csv')
+            info_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/files.csv')
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+      - name: Pushes analysis to another repository
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-directory: 'armeria/1666403176/.github/workflows/actions_build/lint'
+      - run: touch starting_lint_uses172_172
+      - run: rm starting_lint_uses172_172
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -178,10 +394,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_lint_Runthelinters_181
+      - run: rm starting_lint_Runthelinters_181
       - name: Run the linters
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel lint
 
+      - run: touch starting_lint_Cleanupthecache_185
+      - run: rm starting_lint_Cleanupthecache_185
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -198,8 +418,113 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+      - run: touch starting_finished_finished_8979874
+      - run: rm starting_finished_finished_8979874
+      - uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            import pandas as pd
+            import numpy as np
+            import os
+            df = pd.read_csv('/home/runner/inotify-logs.csv', sep = ';', names=['time', 'watched_filename', 'event_filename', 'event_name'])
+            df['event_filename'] = df['event_filename'].replace(np.nan, '')
+            steps = {}
+            starting_indexes = df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'CREATE')].index.to_list() + [df.shape[0]]
+            ending_indexes = [0] + df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'DELETE')].index.to_list()
+            starting_df = df[df['event_filename'].str.contains('starting_')]
+            touch_file_names = ['setup'] + [x.replace('starting_', '') for x in starting_df['event_filename'].value_counts().index.to_list()]
+            for starting_index, ending_index, touch_file_name in zip(starting_indexes, ending_indexes, touch_file_names):
+                steps[touch_file_name] = (ending_index, starting_index)
+            df['watched_filename'] = df['watched_filename'] + df['event_filename']
+            df.drop('event_filename', axis=1, inplace=True)
+            df.rename(columns={'watched_filename':'file_name'}, inplace=True)
+            modify_df = df[df['event_name'] == 'MODIFY']
+            file_names = modify_df['file_name'].value_counts().index.to_list()
+            info = []
+            for file_name in file_names:
+                last_access_step = ''
+                last_modify_step = ''
+                creation_step = ''
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].shape[0] == 0: last_modify_index = -1
+                else: last_modify_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].index.to_list()[-1]
+                last_access_index = 0
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].shape[0] > 0:
+                    last_access_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].index.to_list()[-1]
+                else:
+                    last_access_index = -1
+                    last_access_step = 'Not provided'
+                if last_access_index < last_modify_index:
+                    try:
+                        creation_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'CREATE')].index.to_list()[0]
+                    except:
+                        creation_index = -1
+                        creation_step = 'Not provided'
+                    for touch_file_name, (starting_index, ending_index) in steps.items():
+                        if (last_access_index > starting_index) and (last_access_index < ending_index):
+                            last_access_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (last_modify_index > starting_index) and (last_modify_index < ending_index):
+                            last_modify_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (creation_index > starting_index) and (creation_index < ending_index):
+                            creation_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                    if '/home/runner/work/armeria/armeria/.git/' not in file_name:
+                        info.append({'file_name': file_name, 'last_access_index': last_access_index, 'last_modify_index': last_modify_index, 'creation_index': creation_index, 'last_access_step':last_access_step , 'last_modify_step':last_modify_step, 'creation_step': creation_step})
+            info_df = pd.DataFrame(info)
+            step_statistics = []
+            for step, (starting_index, ending_index) in steps.items():
+                step_name = step if step == 'setup' else step.split('_')[1]
+                if step_name == 'finished': continue
+                created_file_count = info_df[info_df['creation_step'] == step_name].shape[0]
+                created_never_accessed_file_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_access_index'] == -1)].shape[0]
+                modified_files_after_accessed_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_modify_index'] > info_df['last_access_index'])].shape[0]
+                starting_time = list(map(int, df.iloc[starting_index]['time'].split(':')))
+                if ending_index == len(df): ending_time = list(map(int, df.iloc[ending_index-1]['time'].split(':')))
+                else: ending_time = list(map(int, df.iloc[ending_index]['time'].split(':')))
+                hour = ending_time[0] - starting_time[0]
+                if starting_time[1] > ending_time[1]:
+                    minute = ending_time[1] - starting_time[1] + 60
+                    hour -= 1
+                else: minute = ending_time[1] - starting_time[1]
+                if starting_time[2] > ending_time[2]:
+                    second = ending_time[2] - starting_time[2] + 60
+                    minute -= 1
+                else: second = ending_time[2] - starting_time[2]
+                total_seconds = second + (minute * 60) + (hour * 60 * 60)
+                if step_name != '':
+                    step_statistics.append({'step_name': step_name, 'number_of_created_files': created_file_count,
+                     'number_of_files_created_never_accessed': created_never_accessed_file_count, 
+                     'number_files_modified_after_accessed': modified_files_after_accessed_count, 'time': total_seconds})
+            os.mkdir('optimizing-ci-builds-ci-analysis')
+            step_df = pd.DataFrame(step_statistics)
+            step_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/steps.csv')
+            info_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/files.csv')
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+      - name: Pushes analysis to another repository
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-directory: 'armeria/1666403176/.github/workflows/actions_build/site'
+      - run: touch starting_site_uses201_201
+      - run: rm starting_site_uses201_201
       - uses: actions/checkout@v2
 
+      - run: touch starting_site_Installsvgbobcli_203
+      - run: rm starting_site_Installsvgbobcli_203
       - name: Install svgbob_cli
         run: |
           sudo apt-get -y install cargo && cargo install svgbob_cli
@@ -212,6 +537,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_site_Restorethecache_215
+      - run: rm starting_site_Restorethecache_215
       - name: Restore the cache
         uses: actions/cache@v2
         with:
@@ -223,11 +550,15 @@ jobs:
             build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
             build-${{ matrix.java }}-${{ runner.os }}-
 
+      - run: touch starting_site_Buildthesite_226
+      - run: rm starting_site_Buildthesite_226
       - name: Build the site
         run: |
           ./gradlew --no-daemon --stacktrace  --max-workers=2 --parallel site
         shell: bash
 
+      - run: touch starting_site_Cleanupthecache_231
+      - run: rm starting_site_Cleanupthecache_231
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -242,6 +573,109 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+      - run: touch starting_finished_finished_8979874
+      - run: rm starting_finished_finished_8979874
+      - uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            import pandas as pd
+            import numpy as np
+            import os
+            df = pd.read_csv('/home/runner/inotify-logs.csv', sep = ';', names=['time', 'watched_filename', 'event_filename', 'event_name'])
+            df['event_filename'] = df['event_filename'].replace(np.nan, '')
+            steps = {}
+            starting_indexes = df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'CREATE')].index.to_list() + [df.shape[0]]
+            ending_indexes = [0] + df[(df['event_filename'].str.contains('starting_')) & (df['event_name'] == 'DELETE')].index.to_list()
+            starting_df = df[df['event_filename'].str.contains('starting_')]
+            touch_file_names = ['setup'] + [x.replace('starting_', '') for x in starting_df['event_filename'].value_counts().index.to_list()]
+            for starting_index, ending_index, touch_file_name in zip(starting_indexes, ending_indexes, touch_file_names):
+                steps[touch_file_name] = (ending_index, starting_index)
+            df['watched_filename'] = df['watched_filename'] + df['event_filename']
+            df.drop('event_filename', axis=1, inplace=True)
+            df.rename(columns={'watched_filename':'file_name'}, inplace=True)
+            modify_df = df[df['event_name'] == 'MODIFY']
+            file_names = modify_df['file_name'].value_counts().index.to_list()
+            info = []
+            for file_name in file_names:
+                last_access_step = ''
+                last_modify_step = ''
+                creation_step = ''
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].shape[0] == 0: last_modify_index = -1
+                else: last_modify_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'MODIFY')].index.to_list()[-1]
+                last_access_index = 0
+                if df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].shape[0] > 0:
+                    last_access_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'ACCESS')].index.to_list()[-1]
+                else:
+                    last_access_index = -1
+                    last_access_step = 'Not provided'
+                if last_access_index < last_modify_index:
+                    try:
+                        creation_index = df[(df['file_name'] == file_name) & (df['event_name'] == 'CREATE')].index.to_list()[0]
+                    except:
+                        creation_index = -1
+                        creation_step = 'Not provided'
+                    for touch_file_name, (starting_index, ending_index) in steps.items():
+                        if (last_access_index > starting_index) and (last_access_index < ending_index):
+                            last_access_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (last_modify_index > starting_index) and (last_modify_index < ending_index):
+                            last_modify_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                        if (creation_index > starting_index) and (creation_index < ending_index):
+                            creation_step = touch_file_name if touch_file_name == 'setup' else touch_file_name.split('_')[1]
+                    if '/home/runner/work/armeria/armeria/.git/' not in file_name:
+                        info.append({'file_name': file_name, 'last_access_index': last_access_index, 'last_modify_index': last_modify_index, 'creation_index': creation_index, 'last_access_step':last_access_step , 'last_modify_step':last_modify_step, 'creation_step': creation_step})
+            info_df = pd.DataFrame(info)
+            step_statistics = []
+            for step, (starting_index, ending_index) in steps.items():
+                step_name = step if step == 'setup' else step.split('_')[1]
+                if step_name == 'finished': continue
+                created_file_count = info_df[info_df['creation_step'] == step_name].shape[0]
+                created_never_accessed_file_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_access_index'] == -1)].shape[0]
+                modified_files_after_accessed_count = info_df[(info_df['creation_step'] == step_name) & (info_df['last_modify_index'] > info_df['last_access_index'])].shape[0]
+                starting_time = list(map(int, df.iloc[starting_index]['time'].split(':')))
+                if ending_index == len(df): ending_time = list(map(int, df.iloc[ending_index-1]['time'].split(':')))
+                else: ending_time = list(map(int, df.iloc[ending_index]['time'].split(':')))
+                hour = ending_time[0] - starting_time[0]
+                if starting_time[1] > ending_time[1]:
+                    minute = ending_time[1] - starting_time[1] + 60
+                    hour -= 1
+                else: minute = ending_time[1] - starting_time[1]
+                if starting_time[2] > ending_time[2]:
+                    second = ending_time[2] - starting_time[2] + 60
+                    minute -= 1
+                else: second = ending_time[2] - starting_time[2]
+                total_seconds = second + (minute * 60) + (hour * 60 * 60)
+                if step_name != '':
+                    step_statistics.append({'step_name': step_name, 'number_of_created_files': created_file_count,
+                     'number_of_files_created_never_accessed': created_never_accessed_file_count, 
+                     'number_files_modified_after_accessed': modified_files_after_accessed_count, 'time': total_seconds})
+            os.mkdir('optimizing-ci-builds-ci-analysis')
+            step_df = pd.DataFrame(step_statistics)
+            step_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/steps.csv')
+            info_df.to_csv('/home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/files.csv')
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+      - name: Pushes analysis to another repository
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-directory: 'armeria/1666403176/.github/workflows/actions_build/flaky-tests'
+      - run: touch starting_flakytests_uses245_245
+      - run: rm starting_flakytests_uses245_245
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -251,10 +685,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_flakytests_Runflakytests_254
+      - run: rm starting_flakytests_Runflakytests_254
       - name: Run flaky tests
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=2 --parallel check -PnoWeb -PnoLint -PflakyTests=true
 
+      - run: touch starting_flakytests_Summarizethefailedtests_258
+      - run: rm starting_flakytests_Summarizethefailedtests_258
       - name: Summarize the failed tests
         if: failure()
         run: |
@@ -267,6 +705,8 @@ jobs:
           fi
         shell: bash
 
+      - run: touch starting_flakytests_Cleanupthecache_270
+      - run: rm starting_flakytests_Cleanupthecache_270
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -276,7 +716,10 @@ jobs:
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
 
+      - run: touch starting_flakytests_Dumpstuckthreads_279
+      - run: rm starting_flakytests_Dumpstuckthreads_279
       - name: Dump stuck threads
         if: always()
         run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
         shell: bash
+
