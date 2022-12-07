@@ -1,9 +1,6 @@
 name: Publish final artifacts to Maven Central repository
 
-on:
-  push:
-    tags:
-      - armeria-*
+on: [push]
 
 env:
   LC_ALL: "en_US.UTF-8"
@@ -11,9 +8,19 @@ env:
 jobs:
   publish:
     name: Publish final artifacts
-    if: github.repository == 'line/armeria'
     runs-on: self-hosted
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -23,6 +30,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_publish_Restorethecache_26
+      - run: rm starting_publish_Restorethecache_26
       - name: Restore the cache
         uses: actions/cache@v2
         with:
@@ -34,11 +43,15 @@ jobs:
             build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
             build-${{ matrix.java }}-${{ runner.os }}-
 
+      - run: touch starting_publish_BuildwithGradle_37
+      - run: rm starting_publish_BuildwithGradle_37
       - name: Build with Gradle
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel -PflakyTests=false build
         shell: bash
 
+      - run: touch starting_publish_Publishandcloserepository_42
+      - run: rm starting_publish_Publishandcloserepository_42
       - name: Publish and close repository
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=1 publish closeAndReleaseStagingRepository
@@ -52,8 +65,33 @@ jobs:
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
         shell: bash
 
+      - run: touch starting_publish_CleanupGradlecache_55
+      - run: rm starting_publish_CleanupGradlecache_55
       - name: Clean up Gradle cache
         run: |
           rm -f ~/.gradle/caches/modules-2/modules-2.lock
           rm -f ~/.gradle/caches/modules-2/gc.properties
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Execute py script # run file
+        if: always()
+        run: |
+          python .github/workflows/script.py
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+        if: always()
+      - name: Pushes analysis to another repository
+        if: always()
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-branch: 'armeria.1670421945'
+          target-directory: 'armeria/1670421945/.github/workflows/publish-release/publish'
+
