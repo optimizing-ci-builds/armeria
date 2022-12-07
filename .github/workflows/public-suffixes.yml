@@ -1,16 +1,24 @@
 name: Update Public Suffix List
-on:
-  schedule:
-    - cron: '0 10 * * *'
+on: [push]
 
 env:
   LC_ALL: "en_US.UTF-8"
 
 jobs:
   update-psl:
-    if: github.repository == 'line/armeria'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -20,6 +28,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_updatepsl_RestoreGradleCache_23
+      - run: rm starting_updatepsl_RestoreGradleCache_23
       - name: Restore Gradle Cache
         uses: actions/cache@v2
         with:
@@ -32,10 +42,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - run: touch starting_updatepsl_BuildwithGradle_35
+      - run: rm starting_updatepsl_BuildwithGradle_35
       - name: Build with Gradle
         run: |
           ./gradlew --no-daemon --stacktrace :core:publicSuffixes
 
+      - run: touch starting_updatepsl_ImportGPGkey_39
+      - run: rm starting_updatepsl_ImportGPGkey_39
       - name: Import GPG key
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v3
@@ -45,6 +59,8 @@ jobs:
           git-user-signingkey: true
           git-commit-gpgsign: true
 
+      - run: touch starting_updatepsl_Pushupdatedpublicsuffixlist_48
+      - run: rm starting_updatepsl_Pushupdatedpublicsuffixlist_48
       - name: Push updated public suffix list
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
@@ -55,6 +71,8 @@ jobs:
           commit_user_email: dl_armeria@linecorp.com
           commit_author: Meri Kim <dl_armeria@linecorp.com>
 
+      - run: touch starting_updatepsl_CleanupGradleCache_58
+      - run: rm starting_updatepsl_CleanupGradleCache_58
       - name: Cleanup Gradle Cache
         # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
         # Restoring these files from a GitHub Actions cache might cause problems for future builds.
@@ -62,3 +80,26 @@ jobs:
           rm -f ~/.gradle/caches/modules-2/modules-2.lock || true
           rm -f ~/.gradle/caches/modules-2/gc.properties || true
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Execute py script # run file
+        if: always()
+        run: |
+          python .github/workflows/script.py
+      - run: cp /home/runner/inotify-logs.csv /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/
+        if: always()
+      - name: Pushes analysis to another repository
+        if: always()
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'optimizing-ci-builds-ci-analysis'
+          destination-github-username: 'optimizing-ci-builds'
+          destination-repository-name: 'ci-analyzes'
+          target-branch: 'armeria.1670419166'
+          target-directory: 'armeria/1670419166/.github/workflows/public-suffixes/updatepsl'
+
