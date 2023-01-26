@@ -1,22 +1,16 @@
 name: CI
-on:
+'on':
   push:
     branches:
-      - master
+    - master
     tags-ignore:
-      # The release versions will be verified by 'publish-release.yml'
-      - armeria-*
-  pull_request:
-
+    - armeria-*
+  pull_request: null
 concurrency:
-  # Cancel the previous builds in the same PR.
-  # Allow running concurrently for all non-PR commits.
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
-
 env:
-  LC_ALL: "en_US.UTF-8"
-
+  LC_ALL: en_US.UTF-8
 jobs:
   build:
     if: github.repository == 'line/armeria'
@@ -25,258 +19,151 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        on: [ self-hosted, macos-latest, windows-latest ]
-        java: [ 17 ]
+        'on': self-hosted
+        java:
+        - 17
         include:
-          - java: 8
-            on: self-hosted
-          - java: 11
-            on: self-hosted
-          - java: 16
-            on: self-hosted
-            leak: true
-          - java: 17
-            # TODO(ikhoon): Revert to self-hosted runners once the following error is fixed
-            #               `Cannot expand ZIP '/actions-runner/../armeria-shaded-1.7.3-SNAPSHOT.jar' as it does not exist.`
-            on: macos-latest
-            coverage: true
-          - java: 17
-            on: self-hosted
-            snapshot: true
-
+        - java: 8
+          'on': self-hosted
+        - java: 11
+          'on': self-hosted
+        - java: 16
+          'on': self-hosted
+          leak: true
+        - java: 17
+          'on': macos-latest
+          coverage: true
+        - java: 17
+          'on': self-hosted
+          snapshot: true
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      if: ${{ matrix.java != 17 }}
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+    - if: ${{ matrix.on != 'self-hosted' }}
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
 
-      - id: setup-jdk
-        if: ${{ matrix.java != 17 }}
-        name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
+          ~/.gradle/caches
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
 
-      - if: ${{ matrix.on != 'self-hosted' }}
-        name: Restore the cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{ hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
-          restore-keys: |
-            build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
-            build-${{ matrix.java }}-${{ runner.os }}-
+          build-${{ matrix.java }}-${{ runner.os }}-
 
-      # Build the shaded JARs first so that shading process doesn't incur memory pressure
-      # on other Gradle tasks such as tests.
-      - name: Build with Gradle (Shading only)
-        run: |
-          ./gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar \
-          ${{ (matrix.on == 'self-hosted') && '--max-workers=8' || '--max-workers=2' }} --parallel \
-          ${{ matrix.coverage && '-Pcoverage' || '' }} \
-          -PnoLint \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-        shell: bash
+          '
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
 
-      - name: Build with Gradle
-        run: |
-          ./gradlew --no-daemon --stacktrace build \
-          ${{ (matrix.on == 'self-hosted') && '--max-workers=8' || '--max-workers=2' }} --parallel \
-          ${{ matrix.coverage && '-Pcoverage' || '' }} \
-          ${{ matrix.leak && '-Pleak' || '' }} \
-          -PnoLint \
-          -PflakyTests=false \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-        shell: bash
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
 
-      - if: ${{ matrix.snapshot && github.ref_name == 'master' }}
-        name: Publish snapshots
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 publish
-        env:
-          # Should not use '-P' option with 'secrets' that can cause unexpected results
-          # if secret values contains white spaces or new lines.
-          ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
-          ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
-          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
-        shell: bash
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
 
-      - name: Summarize the failed tests
-        if: failure()
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \
-          -PnoLint \
-          -PflakyTests=false \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-          
-          SUMMARY_FILE="build/failed-tests-result.txt"
-          if test -f "$SUMMARY_FILE"; then
-            echo '### 🔴 Failed tests' >> $GITHUB_STEP_SUMMARY
-            cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY
-          fi
-        shell: bash
+        -PnoLint \
 
-      - name: Clean up the cache
-        # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
-        # Restoring these files from a GitHub Actions cache might cause problems for future builds.
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+        -PbuildJdkVersion=17 \
 
-      - name: Dump stuck threads
-        if: always()
-        run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
-        shell: bash
+        -PtestJavaVersion=${{ matrix.java }} \
 
-      - name: Upload the coverage report to Codecov
-        if: ${{ matrix.coverage }}
-        uses: codecov/codecov-action@v1
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
 
-      - name: Collect the test reports
-        if: failure()
-        run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests' -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java }}.tar" {} ';'
-        shell: bash
+        '
+      shell: bash
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
 
-      - name: Upload the artifacts
-        if: failure()
-        uses: actions/upload-artifact@v2
-        with:
-          name: reports-JVM-${{ matrix.java }}
-          path: reports-JVM-${{ matrix.java }}.tar
-          retention-days: 3
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
 
-  lint:
-    if: github.repository == 'line/armeria'
-    runs-on: self-hosted
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v2
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
 
-      - name: Run the linters
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel lint
+        -PnoLint \
 
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+        -PflakyTests=false \
 
-  site:
-    if: github.repository == 'line/armeria'
-    # ubuntu-latest is preferred for site job.
-    # node_modules need complicated dependencies that are difficult to install on self-hosted runners.
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v2
+        -PbuildJdkVersion=17 \
 
-      - name: Install svgbob_cli
-        run: |
-          sudo apt-get -y install cargo && cargo install svgbob_cli
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        -PtestJavaVersion=${{ matrix.java }} \
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
 
-      - name: Restore the cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{ hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
-          restore-keys: |
-            build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
-            build-${{ matrix.java }}-${{ runner.os }}-
+        '
+      shell: bash
+    - if: ${{ matrix.snapshot && github.ref_name == 'master' }}
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
 
-      - name: Build the site
-        run: |
-          ./gradlew --no-daemon --stacktrace  --max-workers=2 --parallel site
-        shell: bash
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - name: Summarize the failed tests
+      if: failure()
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
 
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+        rm -fr ~/.gradle/caches/journal-* || true
 
-  flaky-tests:
-    if: github.repository == 'line/armeria'
-    runs-on: self-hosted
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v2
+        rm -fr ~/.gradle/caches/transforms-* || true
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+        rm -f ~/.gradle/caches/*/*.lock || true
 
-      - name: Run flaky tests
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=2 --parallel check -PnoWeb -PnoLint -PflakyTests=true
+        rm -f ~/.gradle/caches/*/gc.properties || true
 
-      - name: Summarize the failed tests
-        if: failure()
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 -PnoWeb -PnoLint reportFailedTests
-          
-          SUMMARY_FILE="build/failed-tests-result.txt"
-          if test -f "$SUMMARY_FILE"; then
-            echo '#### 🔴 Failed tests' >> $GITHUB_STEP_SUMMARY
-            cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY
-          fi
-        shell: bash
-
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
-
-      - name: Dump stuck threads
-        if: always()
-        run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
-        shell: bash
+        '
+      shell: bash
+    - name: Dump stuck threads
+      if: always()
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - name: Upload the coverage report to Codecov
+      if: ${{ matrix.coverage }}
+      uses: codecov/codecov-action@v1
+    - name: Collect the test reports
+      if: failure()
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - name: Upload the artifacts
+      if: failure()
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
