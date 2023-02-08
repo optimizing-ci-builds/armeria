@@ -1,64 +1,104 @@
 name: Update Public Suffix List
-on:
-  schedule:
-    - cron: '0 10 * * *'
-
+on: [push]
 env:
-  LC_ALL: "en_US.UTF-8"
-
+  LC_ALL: en_US.UTF-8
 jobs:
   update-psl:
-    if: github.repository == 'line/armeria'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_updatepsl_uses-checkout_12
+    - run: rm starting_updatepsl_uses-checkout_12
+    - uses: actions/checkout@v2
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+    - run: touch starting_updatepsl_RestoreGradleCache_19
+    - run: rm starting_updatepsl_RestoreGradleCache_19
+    - name: Restore Gradle Cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper/dists
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          ~/.gradle/caches/jars-3
 
-      - name: Restore Gradle Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/wrapper/dists
-            ~/.gradle/caches/jars-3
-            ~/.gradle/caches/modules-2
-            ~/.gradle/caches/package-lists
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          ~/.gradle/caches/modules-2
 
-      - name: Build with Gradle
-        run: |
-          ./gradlew --no-daemon --stacktrace :core:publicSuffixes
+          ~/.gradle/caches/package-lists
 
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v3
-        with:
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSWORD }}
-          git-user-signingkey: true
-          git-commit-gpgsign: true
+          '
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties')
+          }}
+        restore-keys: '${{ runner.os }}-gradle-
 
-      - name: Push updated public suffix list
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_options: '-S'
-          commit_message: Update public suffix list
-          file_pattern: core/src/main/resources/com/linecorp/armeria/public_suffixes.txt
-          commit_user_name: Meri Kim
-          commit_user_email: dl_armeria@linecorp.com
-          commit_author: Meri Kim <dl_armeria@linecorp.com>
+          '
+    - run: touch starting_updatepsl_BuildwithGradle_36
+    - run: rm starting_updatepsl_BuildwithGradle_36
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace :core:publicSuffixes
 
-      - name: Cleanup Gradle Cache
-        # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
-        # Restoring these files from a GitHub Actions cache might cause problems for future builds.
-        run: |
-          rm -f ~/.gradle/caches/modules-2/modules-2.lock || true
-          rm -f ~/.gradle/caches/modules-2/gc.properties || true
-        shell: bash
+        '
+    - run: touch starting_updatepsl_ImportGPGkey_40
+    - run: rm starting_updatepsl_ImportGPGkey_40
+    - name: Import GPG key
+      id: import_gpg
+      uses: crazy-max/ghaction-import-gpg@v3
+      with:
+        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+        passphrase: ${{ secrets.GPG_PASSWORD }}
+        git-user-signingkey: true
+        git-commit-gpgsign: true
+    - run: touch starting_updatepsl_Pushupdatedpublicsuffixlist_48
+    - run: rm starting_updatepsl_Pushupdatedpublicsuffixlist_48
+    - name: Push updated public suffix list
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_options: -S
+        commit_message: Update public suffix list
+        file_pattern: core/src/main/resources/com/linecorp/armeria/public_suffixes.txt
+        commit_user_name: Meri Kim
+        commit_user_email: dl_armeria@linecorp.com
+        commit_author: Meri Kim <dl_armeria@linecorp.com>
+    - run: touch starting_updatepsl_CleanupGradleCache_57
+    - run: rm starting_updatepsl_CleanupGradleCache_57
+    - name: Cleanup Gradle Cache
+      run: 'rm -f ~/.gradle/caches/modules-2/modules-2.lock || true
+
+        rm -f ~/.gradle/caches/modules-2/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/public-suffixes/updatepsl'
+

@@ -1,282 +1,3020 @@
 name: CI
-on:
-  push:
-    branches:
-      - master
-    tags-ignore:
-      # The release versions will be verified by 'publish-release.yml'
-      - armeria-*
-  pull_request:
-
+on: [push]
 concurrency:
-  # Cancel the previous builds in the same PR.
-  # Allow running concurrently for all non-PR commits.
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
-
 env:
-  LC_ALL: "en_US.UTF-8"
-
+  LC_ALL: en_US.UTF-8
 jobs:
-  build:
-    if: github.repository == 'line/armeria'
+  lint:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_lint_uses-checkout_20
+    - run: rm starting_lint_uses-checkout_20
+    - uses: actions/checkout@v2
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+    - run: touch starting_lint_Runthelinters_27
+    - run: rm starting_lint_Runthelinters_27
+    - name: Run the linters
+      run: './gradlew --no-daemon --stacktrace --max-workers=8 --parallel lint
+
+        '
+    - run: touch starting_lint_Cleanupthecache_31
+    - run: rm starting_lint_Cleanupthecache_31
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/lint'
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_site_uses-checkout_49
+    - run: rm starting_site_uses-checkout_49
+    - uses: actions/checkout@v2
+    - run: touch starting_site_Installsvgbobcli_50
+    - run: rm starting_site_Installsvgbobcli_50
+    - name: Install svgbob_cli
+      run: 'sudo apt-get -y install cargo && cargo install svgbob_cli
+
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+        '
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+    - run: touch starting_site_Restorethecache_62
+    - run: rm starting_site_Restorethecache_62
+    - name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_site_Buildthesite_79
+    - run: rm starting_site_Buildthesite_79
+    - name: Build the site
+      run: './gradlew --no-daemon --stacktrace  --max-workers=2 --parallel site
+
+        '
+      shell: bash
+    - run: touch starting_site_Cleanupthecache_84
+    - run: rm starting_site_Cleanupthecache_84
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/site'
+  flaky-tests:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_flakytests_uses-checkout_102
+    - run: rm starting_flakytests_uses-checkout_102
+    - uses: actions/checkout@v2
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+    - run: touch starting_flakytests_Runflakytests_109
+    - run: rm starting_flakytests_Runflakytests_109
+    - name: Run flaky tests
+      run: './gradlew --no-daemon --stacktrace --max-workers=2 --parallel check -PnoWeb
+        -PnoLint -PflakyTests=true
+
+        '
+    - run: touch starting_flakytests_Summarizethefailedtests_114
+    - run: rm starting_flakytests_Summarizethefailedtests_114
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 -PnoWeb -PnoLint reportFailedTests\n\
+        \nSUMMARY_FILE=\"build/failed-tests-result.txt\"\nif test -f \"$SUMMARY_FILE\"\
+        ; then\n  echo '#### \U0001F534 Failed tests' >> $GITHUB_STEP_SUMMARY\n  cat\
+        \ $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_flakytests_Cleanupthecache_121
+    - run: rm starting_flakytests_Cleanupthecache_121
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_flakytests_Dumpstuckthreads_134
+    - run: rm starting_flakytests_Dumpstuckthreads_134
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/flakytests'
+  'build_on_self-hosted_java_17_include_{''java'': 8, ''on'': ''self-hosted''}':
     runs-on: ${{ matrix.on }}
     timeout-minutes: 80
     strategy:
       fail-fast: false
       matrix:
-        on: [ self-hosted, macos-latest, windows-latest ]
-        java: [ 17 ]
+        on: [push]
+        - self-hosted
+        java:
+        - 17
         include:
-          - java: 8
-            on: self-hosted
-          - java: 11
-            on: self-hosted
-          - java: 16
-            on: self-hosted
-            leak: true
-          - java: 17
-            # TODO(ikhoon): Revert to self-hosted runners once the following error is fixed
-            #               `Cannot expand ZIP '/actions-runner/../armeria-shaded-1.7.3-SNAPSHOT.jar' as it does not exist.`
-            on: macos-latest
-            coverage: true
-          - java: 17
-            on: self-hosted
-            snapshot: true
-
+        - &id001
+          java: 8
+          on: [push]
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_uses-checkout_155
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_uses-checkout_155
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
 
-      - id: setup-jdk
-        if: ${{ matrix.java != 17 }}
-        name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
+          ~/.gradle/caches
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
 
-      - if: ${{ matrix.on != 'self-hosted' }}
-        name: Restore the cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{ hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
-          restore-keys: |
-            build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
-            build-${{ matrix.java }}-${{ runner.os }}-
+          build-${{ matrix.java }}-${{ runner.os }}-
 
-      # Build the shaded JARs first so that shading process doesn't incur memory pressure
-      # on other Gradle tasks such as tests.
-      - name: Build with Gradle (Shading only)
-        run: |
-          ./gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar \
-          ${{ (matrix.on == 'self-hosted') && '--max-workers=8' || '--max-workers=2' }} --parallel \
-          ${{ matrix.coverage && '-Pcoverage' || '' }} \
-          -PnoLint \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-        shell: bash
+          '
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_BuildwithGradleShadingonly_187
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_BuildwithGradleShadingonly_187
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
 
-      - name: Build with Gradle
-        run: |
-          ./gradlew --no-daemon --stacktrace build \
-          ${{ (matrix.on == 'self-hosted') && '--max-workers=8' || '--max-workers=2' }} --parallel \
-          ${{ matrix.coverage && '-Pcoverage' || '' }} \
-          ${{ matrix.leak && '-Pleak' || '' }} \
-          -PnoLint \
-          -PflakyTests=false \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-        shell: bash
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
 
-      - if: ${{ matrix.snapshot && github.ref_name == 'master' }}
-        name: Publish snapshots
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 publish
-        env:
-          # Should not use '-P' option with 'secrets' that can cause unexpected results
-          # if secret values contains white spaces or new lines.
-          ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
-          ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
-          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
-        shell: bash
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
 
-      - name: Summarize the failed tests
-        if: failure()
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \
-          -PnoLint \
-          -PflakyTests=false \
-          -PbuildJdkVersion=17 \
-          -PtestJavaVersion=${{ matrix.java }} \
-          -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
-          
-          SUMMARY_FILE="build/failed-tests-result.txt"
-          if test -f "$SUMMARY_FILE"; then
-            echo '### 🔴 Failed tests' >> $GITHUB_STEP_SUMMARY
-            cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY
-          fi
-        shell: bash
+        -PnoLint \
 
-      - name: Clean up the cache
-        # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
-        # Restoring these files from a GitHub Actions cache might cause problems for future builds.
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+        -PbuildJdkVersion=17 \
 
-      - name: Dump stuck threads
-        if: always()
-        run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
-        shell: bash
+        -PtestJavaVersion=${{ matrix.java }} \
 
-      - name: Upload the coverage report to Codecov
-        if: ${{ matrix.coverage }}
-        uses: codecov/codecov-action@v1
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
 
-      - name: Collect the test reports
-        if: failure()
-        run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests' -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java }}.tar" {} ';'
-        shell: bash
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_BuildwithGradle_207
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_BuildwithGradle_207
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
 
-      - name: Upload the artifacts
-        if: failure()
-        uses: actions/upload-artifact@v2
-        with:
-          name: reports-JVM-${{ matrix.java }}
-          path: reports-JVM-${{ matrix.java }}.tar
-          retention-days: 3
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
 
-  lint:
-    if: github.repository == 'line/armeria'
-    runs-on: self-hosted
-    timeout-minutes: 60
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_Summarizethefailedtests_242
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_Summarizethefailedtests_242
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_Cleanupthecache_251
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_Cleanupthecache_251
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_Dumpstuckthreads_264
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_Dumpstuckthreads_264
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_269
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_269
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_Collectthetestreports_272
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_Collectthetestreports_272
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava8onselfhosted_Uploadtheartifacts_278
+    - run: rm starting_buildonselfhostedjava17includejava8onselfhosted_Uploadtheartifacts_278
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonselfhostedjava17includejava8onselfhosted'
+  'build_on_self-hosted_java_17_include_{''java'': 11, ''on'': ''self-hosted''}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - self-hosted
+        java:
+        - 17
+        include:
+        - &id002
+          java: 11
+          on: [push]
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_uses-checkout_301
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_uses-checkout_301
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          ~/.gradle/caches
 
-      - name: Run the linters
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel lint
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
 
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+          build-${{ matrix.java }}-${{ runner.os }}-
 
-  site:
-    if: github.repository == 'line/armeria'
-    # ubuntu-latest is preferred for site job.
-    # node_modules need complicated dependencies that are difficult to install on self-hosted runners.
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+          '
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_BuildwithGradleShadingonly_333
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_BuildwithGradleShadingonly_333
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_BuildwithGradle_353
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_BuildwithGradle_353
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_Summarizethefailedtests_388
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_Summarizethefailedtests_388
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_Cleanupthecache_397
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_Cleanupthecache_397
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_Dumpstuckthreads_410
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_Dumpstuckthreads_410
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_415
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_415
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_Collectthetestreports_418
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_Collectthetestreports_418
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava11onselfhosted_Uploadtheartifacts_424
+    - run: rm starting_buildonselfhostedjava17includejava11onselfhosted_Uploadtheartifacts_424
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonselfhostedjava17includejava11onselfhosted'
+  'build_on_self-hosted_java_17_include_{''java'': 16, ''on'': ''self-hosted'', ''leak'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - self-hosted
+        java:
+        - 17
+        include:
+        - &id003
+          java: 16
+          on: [push]
+          leak: true
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_uses-checkout_448
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_uses-checkout_448
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
 
-      - name: Install svgbob_cli
-        run: |
-          sudo apt-get -y install cargo && cargo install svgbob_cli
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          ~/.gradle/caches
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
 
-      - name: Restore the cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{ hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
-          restore-keys: |
-            build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
-            build-${{ matrix.java }}-${{ runner.os }}-
+          build-${{ matrix.java }}-${{ runner.os }}-
 
-      - name: Build the site
-        run: |
-          ./gradlew --no-daemon --stacktrace  --max-workers=2 --parallel site
-        shell: bash
+          '
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_480
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_480
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
 
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
 
-  flaky-tests:
-    if: github.repository == 'line/armeria'
-    runs-on: self-hosted
-    timeout-minutes: 60
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_BuildwithGradle_500
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_BuildwithGradle_500
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_535
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_535
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Cleanupthecache_544
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Cleanupthecache_544
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_557
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_557
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_562
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_562
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Collectthetestreports_565
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Collectthetestreports_565
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_571
+    - run: rm starting_buildonselfhostedjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_571
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonselfhostedjava17includejava16onselfhostedleakTrue'
+  'build_on_self-hosted_java_17_include_{''java'': 17, ''on'': ''macos-latest'', ''coverage'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - self-hosted
+        java:
+        - 17
+        include:
+        - &id004
+          java: 17
+          on: [push]
+          coverage: true
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_uses-checkout_595
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_uses-checkout_595
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
 
-      - id: setup-jdk-17
-        name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          ~/.gradle/caches
 
-      - name: Run flaky tests
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=2 --parallel check -PnoWeb -PnoLint -PflakyTests=true
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
 
-      - name: Summarize the failed tests
-        if: failure()
-        run: |
-          ./gradlew --no-daemon --stacktrace --max-workers=1 -PnoWeb -PnoLint reportFailedTests
-          
-          SUMMARY_FILE="build/failed-tests-result.txt"
-          if test -f "$SUMMARY_FILE"; then
-            echo '#### 🔴 Failed tests' >> $GITHUB_STEP_SUMMARY
-            cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY
-          fi
-        shell: bash
+          build-${{ matrix.java }}-${{ runner.os }}-
 
-      - name: Clean up the cache
-        run: |
-          rm -fr ~/.gradle/caches/[0-9]* || true
-          rm -fr ~/.gradle/caches/journal-* || true
-          rm -fr ~/.gradle/caches/transforms-* || true
-          rm -f ~/.gradle/caches/*/*.lock || true
-          rm -f ~/.gradle/caches/*/gc.properties || true
-        shell: bash
+          '
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_627
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_627
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
 
-      - name: Dump stuck threads
-        if: always()
-        run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
-        shell: bash
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_647
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_647
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_682
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_682
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_691
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_691
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_704
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_704
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_709
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_709
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_712
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_712
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_718
+    - run: rm starting_buildonselfhostedjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_718
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonselfhostedjava17includejava17onmacoslatestcoverageTrue'
+  'build_on_self-hosted_java_17_include_{''java'': 17, ''on'': ''self-hosted'', ''snapshot'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - self-hosted
+        java:
+        - 17
+        include:
+        - &id005
+          java: 17
+          on: [push]
+          snapshot: true
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_uses-checkout_742
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_uses-checkout_742
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_774
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_774
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_794
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_794
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_829
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_829
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_838
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_838
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_851
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_851
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_856
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_856
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_859
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_859
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_865
+    - run: rm starting_buildonselfhostedjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_865
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonselfhostedjava17includejava17onselfhostedsnapshotTrue'
+  'build_on_macos-latest_java_17_include_{''java'': 8, ''on'': ''self-hosted''}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - macos-latest
+        java:
+        - 17
+        include:
+        - *id001
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_uses-checkout_886
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_uses-checkout_886
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_BuildwithGradleShadingonly_918
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_BuildwithGradleShadingonly_918
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_BuildwithGradle_938
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_BuildwithGradle_938
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_Summarizethefailedtests_973
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_Summarizethefailedtests_973
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_Cleanupthecache_982
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_Cleanupthecache_982
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_Dumpstuckthreads_995
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_Dumpstuckthreads_995
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_1000
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_1000
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_Collectthetestreports_1003
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_Collectthetestreports_1003
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava8onselfhosted_Uploadtheartifacts_1009
+    - run: rm starting_buildonmacoslatestjava17includejava8onselfhosted_Uploadtheartifacts_1009
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonmacoslatestjava17includejava8onselfhosted'
+  'build_on_macos-latest_java_17_include_{''java'': 11, ''on'': ''self-hosted''}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - macos-latest
+        java:
+        - 17
+        include:
+        - *id002
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_uses-checkout_1030
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_uses-checkout_1030
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_BuildwithGradleShadingonly_1062
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_BuildwithGradleShadingonly_1062
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_BuildwithGradle_1082
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_BuildwithGradle_1082
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_Summarizethefailedtests_1117
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_Summarizethefailedtests_1117
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_Cleanupthecache_1126
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_Cleanupthecache_1126
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_Dumpstuckthreads_1139
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_Dumpstuckthreads_1139
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_1144
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_1144
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_Collectthetestreports_1147
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_Collectthetestreports_1147
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava11onselfhosted_Uploadtheartifacts_1153
+    - run: rm starting_buildonmacoslatestjava17includejava11onselfhosted_Uploadtheartifacts_1153
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonmacoslatestjava17includejava11onselfhosted'
+  'build_on_macos-latest_java_17_include_{''java'': 16, ''on'': ''self-hosted'', ''leak'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - macos-latest
+        java:
+        - 17
+        include:
+        - *id003
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_uses-checkout_1174
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_uses-checkout_1174
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_1206
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_1206
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_BuildwithGradle_1226
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_BuildwithGradle_1226
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_1261
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_1261
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Cleanupthecache_1270
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Cleanupthecache_1270
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_1283
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_1283
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_1288
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_1288
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Collectthetestreports_1291
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Collectthetestreports_1291
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_1297
+    - run: rm starting_buildonmacoslatestjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_1297
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonmacoslatestjava17includejava16onselfhostedleakTrue'
+  'build_on_macos-latest_java_17_include_{''java'': 17, ''on'': ''macos-latest'', ''coverage'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - macos-latest
+        java:
+        - 17
+        include:
+        - *id004
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_uses-checkout_1318
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_uses-checkout_1318
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_1350
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_1350
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_1370
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_1370
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_1405
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_1405
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_1414
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_1414
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_1427
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_1427
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_1432
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_1432
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_1435
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_1435
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_1441
+    - run: rm starting_buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_1441
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonmacoslatestjava17includejava17onmacoslatestcoverageTrue'
+  'build_on_macos-latest_java_17_include_{''java'': 17, ''on'': ''self-hosted'', ''snapshot'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - macos-latest
+        java:
+        - 17
+        include:
+        - *id005
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_uses-checkout_1462
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_uses-checkout_1462
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_1494
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_1494
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_1514
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_1514
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_1549
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_1549
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_1558
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_1558
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_1571
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_1571
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_1576
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_1576
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_1579
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_1579
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_1585
+    - run: rm starting_buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_1585
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonmacoslatestjava17includejava17onselfhostedsnapshotTrue'
+  'build_on_windows-latest_java_17_include_{''java'': 8, ''on'': ''self-hosted''}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - windows-latest
+        java:
+        - 17
+        include:
+        - *id001
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_uses-checkout_1606
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_uses-checkout_1606
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_BuildwithGradleShadingonly_1638
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_BuildwithGradleShadingonly_1638
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_BuildwithGradle_1658
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_BuildwithGradle_1658
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_Summarizethefailedtests_1693
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_Summarizethefailedtests_1693
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_Cleanupthecache_1702
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_Cleanupthecache_1702
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_Dumpstuckthreads_1715
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_Dumpstuckthreads_1715
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_1720
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_UploadthecoveragereporttoCodecov_1720
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_Collectthetestreports_1723
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_Collectthetestreports_1723
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava8onselfhosted_Uploadtheartifacts_1729
+    - run: rm starting_buildonwindowslatestjava17includejava8onselfhosted_Uploadtheartifacts_1729
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonwindowslatestjava17includejava8onselfhosted'
+  'build_on_windows-latest_java_17_include_{''java'': 11, ''on'': ''self-hosted''}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - windows-latest
+        java:
+        - 17
+        include:
+        - *id002
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_uses-checkout_1750
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_uses-checkout_1750
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_BuildwithGradleShadingonly_1782
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_BuildwithGradleShadingonly_1782
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_BuildwithGradle_1802
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_BuildwithGradle_1802
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_Summarizethefailedtests_1837
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_Summarizethefailedtests_1837
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_Cleanupthecache_1846
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_Cleanupthecache_1846
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_Dumpstuckthreads_1859
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_Dumpstuckthreads_1859
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_1864
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_UploadthecoveragereporttoCodecov_1864
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_Collectthetestreports_1867
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_Collectthetestreports_1867
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava11onselfhosted_Uploadtheartifacts_1873
+    - run: rm starting_buildonwindowslatestjava17includejava11onselfhosted_Uploadtheartifacts_1873
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonwindowslatestjava17includejava11onselfhosted'
+  'build_on_windows-latest_java_17_include_{''java'': 16, ''on'': ''self-hosted'', ''leak'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - windows-latest
+        java:
+        - 17
+        include:
+        - *id003
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_uses-checkout_1894
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_uses-checkout_1894
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_1926
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_BuildwithGradleShadingonly_1926
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_BuildwithGradle_1946
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_BuildwithGradle_1946
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_1981
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Summarizethefailedtests_1981
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Cleanupthecache_1990
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Cleanupthecache_1990
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_2003
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Dumpstuckthreads_2003
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_2008
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_UploadthecoveragereporttoCodecov_2008
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Collectthetestreports_2011
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Collectthetestreports_2011
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_2017
+    - run: rm starting_buildonwindowslatestjava17includejava16onselfhostedleakTrue_Uploadtheartifacts_2017
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonwindowslatestjava17includejava16onselfhostedleakTrue'
+  'build_on_windows-latest_java_17_include_{''java'': 17, ''on'': ''macos-latest'', ''coverage'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - windows-latest
+        java:
+        - 17
+        include:
+        - *id004
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_uses-checkout_2038
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_uses-checkout_2038
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_2070
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradleShadingonly_2070
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_2090
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_BuildwithGradle_2090
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_2125
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Summarizethefailedtests_2125
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_2134
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Cleanupthecache_2134
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_2147
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Dumpstuckthreads_2147
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_2152
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_UploadthecoveragereporttoCodecov_2152
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_2155
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Collectthetestreports_2155
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_2161
+    - run: rm starting_buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue_Uploadtheartifacts_2161
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonwindowslatestjava17includejava17onmacoslatestcoverageTrue'
+  'build_on_windows-latest_java_17_include_{''java'': 17, ''on'': ''self-hosted'', ''snapshot'': True}':
+    runs-on: ${{ matrix.on }}
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      matrix:
+        on: [push]
+        - windows-latest
+        java:
+        - 17
+        include:
+        - *id005
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        pip install numpy
+    - run: sudo apt update
+    - run: sudo apt install inotify-tools
+    - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'basak'
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_uses-checkout_2182
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_uses-checkout_2182
+    - uses: actions/checkout@v2
+    - id: setup-jdk
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - id: setup-jdk-17
+      name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: '17'
+      name: Restore the cache
+      uses: actions/cache@v2
+      with:
+        path: '~/.gradle/wrapper
+
+          ~/.gradle/caches
+
+          '
+        key: build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-${{
+          hashFiles('gradle.properties', 'gradle/wrapper/gradle-wrapper.properties',
+          '**/build.gradle', 'dependencies.yml', '*/package-lock.json') }}
+        restore-keys: 'build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION
+          }}-
+
+          build-${{ matrix.java }}-${{ runner.os }}-
+
+          '
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_2214
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradleShadingonly_2214
+    - name: Build with Gradle (Shading only)
+      run: './gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar
+        \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        -PnoLint \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_2234
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_BuildwithGradle_2234
+    - name: Build with Gradle
+      run: './gradlew --no-daemon --stacktrace build \
+
+        ${{ (matrix.on == ''self-hosted'') && ''--max-workers=8'' || ''--max-workers=2''
+        }} --parallel \
+
+        ${{ matrix.coverage && ''-Pcoverage'' || '''' }} \
+
+        ${{ matrix.leak && ''-Pleak'' || '''' }} \
+
+        -PnoLint \
+
+        -PflakyTests=false \
+
+        -PbuildJdkVersion=17 \
+
+        -PtestJavaVersion=${{ matrix.java }} \
+
+        -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path
+        }},${{ steps.setup-jdk.outputs.path }}
+
+        '
+      shell: bash
+      name: Publish snapshots
+      run: './gradlew --no-daemon --stacktrace --max-workers=1 publish
+
+        '
+      env:
+        ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USER_NAME }}
+        ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+        ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_2269
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Summarizethefailedtests_2269
+    - name: Summarize the failed tests
+      run: "./gradlew --no-daemon --stacktrace --max-workers=1 reportFailedTests \\\
+        \n-PnoLint \\\n-PflakyTests=false \\\n-PbuildJdkVersion=17 \\\n-PtestJavaVersion=${{\
+        \ matrix.java }} \\\n-Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path\
+        \ }},${{ steps.setup-jdk.outputs.path }}\n\nSUMMARY_FILE=\"build/failed-tests-result.txt\"\
+        \nif test -f \"$SUMMARY_FILE\"; then\n  echo '### \U0001F534 Failed tests'\
+        \ >> $GITHUB_STEP_SUMMARY\n  cat $SUMMARY_FILE >> $GITHUB_STEP_SUMMARY\nfi\n"
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_2278
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Cleanupthecache_2278
+    - name: Clean up the cache
+      run: 'rm -fr ~/.gradle/caches/[0-9]* || true
+
+        rm -fr ~/.gradle/caches/journal-* || true
+
+        rm -fr ~/.gradle/caches/transforms-* || true
+
+        rm -f ~/.gradle/caches/*/*.lock || true
+
+        rm -f ~/.gradle/caches/*/gc.properties || true
+
+        '
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_2291
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Dumpstuckthreads_2291
+    - name: Dump stuck threads
+      run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} ||
+        true
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_2296
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_UploadthecoveragereporttoCodecov_2296
+    - name: Upload the coverage report to Codecov
+      uses: codecov/codecov-action@v1
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_2299
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Collectthetestreports_2299
+    - name: Collect the test reports
+      run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests'
+        -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java
+        }}.tar" {} ';'
+      shell: bash
+    - run: touch starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_2305
+    - run: rm starting_buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue_Uploadtheartifacts_2305
+    - name: Upload the artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: reports-JVM-${{ matrix.java }}
+        path: reports-JVM-${{ matrix.java }}.tar
+        retention-days: 3
+    - run: touch starting_finished_finished_8979874
+      if: always()
+    - run: rm starting_finished_finished_8979874
+      if: always()
+    - name: Execute py script # run file
+      if: always()
+      run: |
+        python .github/workflows/script.py
+    - name: Pushes analysis to another repository
+      if: always()
+      id: push_directory
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source-directory: 'optimizing-ci-builds-ci-analysis'
+        destination-github-username: 'UT-SE-Research'
+        destination-repository-name: 'ci-analyzes'
+        target-branch: '1675896667'
+        target-directory: 'armeria/.github/workflows/actions_build/buildonwindowslatestjava17includejava17onselfhostedsnapshotTrue'
+
