@@ -1,12 +1,6 @@
 name: CI
-on:
-  push:
-    branches:
-      - master
-    tags-ignore:
+on: [push]
       # The release versions will be verified by 'publish-release.yml'
-      - armeria-*
-  pull_request:
 
 concurrency:
   # Cancel the previous builds in the same PR.
@@ -25,26 +19,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        on: [ self-hosted, macos-latest, windows-latest ]
+        on: [push]
         java: [ 17 ]
         include:
           - java: 8
-            on: self-hosted
+            on: [push]
           - java: 11
-            on: self-hosted
+            on: [push]
           - java: 16
-            on: self-hosted
+            on: [push]
             leak: true
           - java: 17
             # TODO(ikhoon): Revert to self-hosted runners once the following error is fixed
             #               `Cannot expand ZIP '/actions-runner/../armeria-shaded-1.7.3-SNAPSHOT.jar' as it does not exist.`
-            on: macos-latest
+            on: [push]
             coverage: true
           - java: 17
-            on: self-hosted
+            on: [push]
             snapshot: true
 
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'optimizing-ci-builds'
       - uses: actions/checkout@v2
 
       - id: setup-jdk
@@ -76,6 +81,8 @@ jobs:
 
       # Build the shaded JARs first so that shading process doesn't incur memory pressure
       # on other Gradle tasks such as tests.
+      - run: touch starting_build_BuildwithGradleShadingonly_79
+      - run: rm starting_build_BuildwithGradleShadingonly_79
       - name: Build with Gradle (Shading only)
         run: |
           ./gradlew --no-daemon --stacktrace shadedJar shadedTestJar trimShadedJar \
@@ -87,6 +94,8 @@ jobs:
           -Porg.gradle.java.installations.paths=${{ steps.setup-jdk-17.outputs.path }},${{ steps.setup-jdk.outputs.path }}
         shell: bash
 
+      - run: touch starting_build_BuildwithGradle_90
+      - run: rm starting_build_BuildwithGradle_90
       - name: Build with Gradle
         run: |
           ./gradlew --no-daemon --stacktrace build \
@@ -114,6 +123,8 @@ jobs:
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
         shell: bash
 
+      - run: touch starting_build_Summarizethefailedtests_117
+      - run: rm starting_build_Summarizethefailedtests_117
       - name: Summarize the failed tests
         if: failure()
         run: |
@@ -131,6 +142,8 @@ jobs:
           fi
         shell: bash
 
+      - run: touch starting_build_Cleanupthecache_134
+      - run: rm starting_build_Cleanupthecache_134
       - name: Clean up the cache
         # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
         # Restoring these files from a GitHub Actions cache might cause problems for future builds.
@@ -142,20 +155,28 @@ jobs:
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
 
+      - run: touch starting_build_Dumpstuckthreads_145
+      - run: rm starting_build_Dumpstuckthreads_145
       - name: Dump stuck threads
         if: always()
         run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
         shell: bash
 
+      - run: touch starting_build_UploadthecoveragereporttoCodecov_150
+      - run: rm starting_build_UploadthecoveragereporttoCodecov_150
       - name: Upload the coverage report to Codecov
         if: ${{ matrix.coverage }}
         uses: codecov/codecov-action@v1
 
+      - run: touch starting_build_Collectthetestreports_154
+      - run: rm starting_build_Collectthetestreports_154
       - name: Collect the test reports
         if: failure()
         run: find . '(' -name 'java_pid*.hprof' -or -name 'hs_err_*.log' -or -path '*/build/reports/tests' -or -path '*/build/test-results' ')' -exec tar rf "reports-JVM-${{ matrix.java }}.tar" {} ';'
         shell: bash
 
+      - run: touch starting_build_Uploadtheartifacts_159
+      - run: rm starting_build_Uploadtheartifacts_159
       - name: Upload the artifacts
         if: failure()
         uses: actions/upload-artifact@v2
@@ -163,12 +184,65 @@ jobs:
           name: reports-JVM-${{ matrix.java }}
           path: reports-JVM-${{ matrix.java }}.tar
           retention-days: 3
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Check script file exists and execute
+        if: always()
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: .github/workflows/script.py
+      - name: File exists
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          python .github/workflows/script.py
+      - name: Checkout to destination CI-analyzes repo
+        uses: actions/checkout@v3
+        if: always()
+        with:
+          path: armeria
+          ref: '1679926079-168599f'
+          repository: 'UT-SE-Research/ci-analyzes'
+          token: '${{ secrets.API_TOKEN_GITHUB }}'
+          persist-credentials: true
+      - name: Copy files to push to another directory
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          mkdir -p armeria/armeria/.github/workflows/actions_build/build_on_${{ matrix.on }}_java_${{ matrix.java }}_include_${{ matrix.include }}
+          cp -rvT optimizing-ci-builds-ci-analysis armeria/armeria/.github/workflows/actions_build/build_on_${{ matrix.on }}_java_${{ matrix.java }}_include_${{ matrix.include }}
+      - run: echo https://github.com/UT-SE-Research/ci-analyzes/tree/1679926079-168599f/armeria/.github/workflows/actions_build/build_on_${{ matrix.on }}_java_${{ matrix.java }}_include_${{ matrix.include }}
+      - name: Pushes analysis to another repository
+        if: steps.check_files.outputs.files_exists == 'true'
+        working-directory: armeria
+        run: |
+          commit_message=$GITHUB_REPOSITORY@$GITHUB_WORKFLOW_SHA
+          git config --global user.name 'UT-SE-Research'
+          git config --global user.email '${{ secrets.EMAIL }}'
+          git add .
+          git commit -m $commit_message
+          while ! git push -f origin 1679926079-168599f; do
+            git pull --rebase origin 1679926079-168599f
+            sleep $((RANDOM % 5 + 1))
+          done
 
   lint:
     if: github.repository == 'line/armeria'
     runs-on: self-hosted
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'optimizing-ci-builds'
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -178,10 +252,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_lint_Runthelinters_181
+      - run: rm starting_lint_Runthelinters_181
       - name: Run the linters
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel lint
 
+      - run: touch starting_lint_Cleanupthecache_185
+      - run: rm starting_lint_Cleanupthecache_185
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -190,6 +268,48 @@ jobs:
           rm -f ~/.gradle/caches/*/*.lock || true
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Check script file exists and execute
+        if: always()
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: .github/workflows/script.py
+      - name: File exists
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          python .github/workflows/script.py
+      - name: Checkout to destination CI-analyzes repo
+        uses: actions/checkout@v3
+        if: always()
+        with:
+          path: armeria
+          ref: '1679926079-168599f'
+          repository: 'UT-SE-Research/ci-analyzes'
+          token: '${{ secrets.API_TOKEN_GITHUB }}'
+          persist-credentials: true
+      - name: Copy files to push to another directory
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          mkdir -p armeria/armeria/.github/workflows/actions_build/lint
+          cp -rvT optimizing-ci-builds-ci-analysis armeria/armeria/.github/workflows/actions_build/lint
+      - run: echo https://github.com/UT-SE-Research/ci-analyzes/tree/1679926079-168599f/armeria/.github/workflows/actions_build/lint
+      - name: Pushes analysis to another repository
+        if: steps.check_files.outputs.files_exists == 'true'
+        working-directory: armeria
+        run: |
+          commit_message=$GITHUB_REPOSITORY@$GITHUB_WORKFLOW_SHA
+          git config --global user.name 'UT-SE-Research'
+          git config --global user.email '${{ secrets.EMAIL }}'
+          git add .
+          git commit -m $commit_message
+          while ! git push -f origin 1679926079-168599f; do
+            git pull --rebase origin 1679926079-168599f
+            sleep $((RANDOM % 5 + 1))
+          done
 
   site:
     if: github.repository == 'line/armeria'
@@ -198,8 +318,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'optimizing-ci-builds'
       - uses: actions/checkout@v2
 
+      - run: touch starting_site_Installsvgbobcli_203
+      - run: rm starting_site_Installsvgbobcli_203
       - name: Install svgbob_cli
         run: |
           sudo apt-get -y install cargo && cargo install svgbob_cli
@@ -212,6 +345,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_site_Restorethecache_215
+      - run: rm starting_site_Restorethecache_215
       - name: Restore the cache
         uses: actions/cache@v2
         with:
@@ -223,11 +358,15 @@ jobs:
             build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
             build-${{ matrix.java }}-${{ runner.os }}-
 
+      - run: touch starting_site_Buildthesite_226
+      - run: rm starting_site_Buildthesite_226
       - name: Build the site
         run: |
           ./gradlew --no-daemon --stacktrace  --max-workers=2 --parallel site
         shell: bash
 
+      - run: touch starting_site_Cleanupthecache_231
+      - run: rm starting_site_Cleanupthecache_231
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -236,12 +375,65 @@ jobs:
           rm -f ~/.gradle/caches/*/*.lock || true
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Check script file exists and execute
+        if: always()
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: .github/workflows/script.py
+      - name: File exists
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          python .github/workflows/script.py
+      - name: Checkout to destination CI-analyzes repo
+        uses: actions/checkout@v3
+        if: always()
+        with:
+          path: armeria
+          ref: '1679926079-168599f'
+          repository: 'UT-SE-Research/ci-analyzes'
+          token: '${{ secrets.API_TOKEN_GITHUB }}'
+          persist-credentials: true
+      - name: Copy files to push to another directory
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          mkdir -p armeria/armeria/.github/workflows/actions_build/site
+          cp -rvT optimizing-ci-builds-ci-analysis armeria/armeria/.github/workflows/actions_build/site
+      - run: echo https://github.com/UT-SE-Research/ci-analyzes/tree/1679926079-168599f/armeria/.github/workflows/actions_build/site
+      - name: Pushes analysis to another repository
+        if: steps.check_files.outputs.files_exists == 'true'
+        working-directory: armeria
+        run: |
+          commit_message=$GITHUB_REPOSITORY@$GITHUB_WORKFLOW_SHA
+          git config --global user.name 'UT-SE-Research'
+          git config --global user.email '${{ secrets.EMAIL }}'
+          git add .
+          git commit -m $commit_message
+          while ! git push -f origin 1679926079-168599f; do
+            git pull --rebase origin 1679926079-168599f
+            sleep $((RANDOM % 5 + 1))
+          done
 
   flaky-tests:
     if: github.repository == 'line/armeria'
     runs-on: self-hosted
     timeout-minutes: 60
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'optimizing-ci-builds'
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -251,10 +443,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_flakytests_Runflakytests_254
+      - run: rm starting_flakytests_Runflakytests_254
       - name: Run flaky tests
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=2 --parallel check -PnoWeb -PnoLint -PflakyTests=true
 
+      - run: touch starting_flakytests_Summarizethefailedtests_258
+      - run: rm starting_flakytests_Summarizethefailedtests_258
       - name: Summarize the failed tests
         if: failure()
         run: |
@@ -267,6 +463,8 @@ jobs:
           fi
         shell: bash
 
+      - run: touch starting_flakytests_Cleanupthecache_270
+      - run: rm starting_flakytests_Cleanupthecache_270
       - name: Clean up the cache
         run: |
           rm -fr ~/.gradle/caches/[0-9]* || true
@@ -276,7 +474,51 @@ jobs:
           rm -f ~/.gradle/caches/*/gc.properties || true
         shell: bash
 
+      - run: touch starting_flakytests_Dumpstuckthreads_279
+      - run: rm starting_flakytests_Dumpstuckthreads_279
       - name: Dump stuck threads
         if: always()
         run: jps | grep -vi "jps" | awk '{ print $1 }' | xargs -I'{}' jstack -l {} || true
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: Check script file exists and execute
+        if: always()
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: .github/workflows/script.py
+      - name: File exists
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          python .github/workflows/script.py
+      - name: Checkout to destination CI-analyzes repo
+        uses: actions/checkout@v3
+        if: always()
+        with:
+          path: armeria
+          ref: '1679926079-168599f'
+          repository: 'UT-SE-Research/ci-analyzes'
+          token: '${{ secrets.API_TOKEN_GITHUB }}'
+          persist-credentials: true
+      - name: Copy files to push to another directory
+        if: steps.check_files.outputs.files_exists == 'true'
+        run: |
+          mkdir -p armeria/armeria/.github/workflows/actions_build/flakytests
+          cp -rvT optimizing-ci-builds-ci-analysis armeria/armeria/.github/workflows/actions_build/flakytests
+      - run: echo https://github.com/UT-SE-Research/ci-analyzes/tree/1679926079-168599f/armeria/.github/workflows/actions_build/flakytests
+      - name: Pushes analysis to another repository
+        if: steps.check_files.outputs.files_exists == 'true'
+        working-directory: armeria
+        run: |
+          commit_message=$GITHUB_REPOSITORY@$GITHUB_WORKFLOW_SHA
+          git config --global user.name 'UT-SE-Research'
+          git config --global user.email '${{ secrets.EMAIL }}'
+          git add .
+          git commit -m $commit_message
+          while ! git push -f origin 1679926079-168599f; do
+            git pull --rebase origin 1679926079-168599f
+            sleep $((RANDOM % 5 + 1))
+          done
