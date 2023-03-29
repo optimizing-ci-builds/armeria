@@ -65,7 +65,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-        name: Restore the cache
+      - name: Restore the cache
         uses: actions/cache@v2
         with:
           path: |
