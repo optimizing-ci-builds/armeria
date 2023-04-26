@@ -1,9 +1,6 @@
 name: Publish final artifacts to Maven Central repository
 
-on:
-  push:
-    tags:
-      - armeria-*
+on: [push]
 
 env:
   LC_ALL: "en_US.UTF-8"
@@ -11,9 +8,19 @@ env:
 jobs:
   publish:
     name: Publish final artifacts
-    if: github.repository == 'line/armeria'
     runs-on: self-hosted
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+          pip install numpy
+      - run: sudo apt update
+      - run: sudo apt install inotify-tools
+      - run: inotifywait -mr /home/runner/work/armeria/armeria/ --format '%T;%w;%f;%e' --timefmt %T -o /home/runner/inotify-logs.csv & echo 'optimizing-ci-builds'
       - uses: actions/checkout@v2
 
       - id: setup-jdk-17
@@ -23,6 +30,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - run: touch starting_publish_Restorethecache_26
+      - run: rm starting_publish_Restorethecache_26
       - name: Restore the cache
         uses: actions/cache@v2
         with:
@@ -34,11 +43,15 @@ jobs:
             build-${{ matrix.java }}-${{ runner.os }}-${{ secrets.CACHE_VERSION }}-
             build-${{ matrix.java }}-${{ runner.os }}-
 
+      - run: touch starting_publish_BuildwithGradle_37
+      - run: rm starting_publish_BuildwithGradle_37
       - name: Build with Gradle
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=8 --parallel -PflakyTests=false build
         shell: bash
 
+      - run: touch starting_publish_Publishandcloserepository_42
+      - run: rm starting_publish_Publishandcloserepository_42
       - name: Publish and close repository
         run: |
           ./gradlew --no-daemon --stacktrace --max-workers=1 publish closeAndReleaseStagingRepository
@@ -52,8 +65,51 @@ jobs:
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSWORD }}
         shell: bash
 
+      - run: touch starting_publish_CleanupGradlecache_55
+      - run: rm starting_publish_CleanupGradlecache_55
       - name: Clean up Gradle cache
         run: |
           rm -f ~/.gradle/caches/modules-2/modules-2.lock
           rm -f ~/.gradle/caches/modules-2/gc.properties
         shell: bash
+      - run: touch starting_finished_finished_8979874
+        if: always()
+      - run: rm starting_finished_finished_8979874
+        if: always()
+      - name: rat check
+        if: always()
+        run: |
+           if [ -f /home/runner/work/armeria/armeria/target/rat.txt ]; then cat /home/runner/work/armeria/armeria/target/rat.txt; fi
+      - name: Check script file exists and execute
+        if: always()
+        run: |
+          [ -f .github/workflows/script.py ] && python .github/workflows/script.py
+          [ -f /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/job.csv ] || mkdir -p /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/; echo "${GITHUB_RUN_ID},${GITHUB_JOB},armeria,${GITHUB_WORKFLOW}" > /home/runner/work/armeria/armeria/optimizing-ci-builds-ci-analysis/job.csv
+      - name: Checkout to destination CI-analyzes repo
+        uses: actions/checkout@v3
+        if: always()
+        with:
+          path: armeria
+          ref: '1682523290-0fc650d'
+          repository: 'UT-SE-Research/ci-analyzes'
+          token: '${{ secrets.API_TOKEN_GITHUB }}'
+          persist-credentials: true
+      - name: Copy files to push to another directory
+        if: always()
+        run: |
+          mkdir -p armeria/armeria/.github/workflows/publish-release/publish
+          cp -rvT optimizing-ci-builds-ci-analysis armeria/armeria/.github/workflows/publish-release/publish
+      - run: echo https://github.com/UT-SE-Research/ci-analyzes/tree/1682523290-0fc650d/armeria/.github/workflows/publish-release/publish
+      - name: Pushes analysis to another repository
+        if: always()
+        working-directory: armeria
+        run: |
+          commit_message=$GITHUB_REPOSITORY@$GITHUB_WORKFLOW_SHA
+          git config --global user.name 'UT-SE-Research'
+          git config --global user.email '${{ secrets.EMAIL }}'
+          git add .
+          git commit -m $commit_message
+          while ! git push origin 1682523290-0fc650d; do
+            git pull --rebase origin 1682523290-0fc650d
+            sleep $((RANDOM % 5 + 1))
+          done
